@@ -11,45 +11,77 @@ this file and include it in basic-server.js so that it actually works.
 *Hint* Check out the node module documentation at http://nodejs.org/api/modules.html.
 
 **************************************************************/
+const decodeUriComponent = require('decode-uri-component');
+
 var url = require('url');
 var fs = require('fs');
 var output = {results: []};
-
+var nextId = 1;
 var requestHandler = function(request, response) {
   console.log('Serving request type ' + request.method + ' for url ' + request.url);
 
   var headers = defaultCorsHeaders;
   headers['Content-Type'] = 'application/json';
 
-
   var statusCode;
-  if (request.url === '/classes/messages') {
+
+  var urlArray = parseRequest(request.url);
+  
+  if (request.method === 'OPTIONS') {
+    statusCode = 200;
+    response.writeHead(statusCode, headers);
+    response.end();
+  } else if (urlArray[0] === '/classes/messages') {
 
     if (request.method === 'GET') {
-      response.results = messages;
-      statusCode = 200;
-      
-      response.writeHead(statusCode, headers);
-      response.end(JSON.stringify(output));
+      if (output.results.length === 0) {
+        statusCode = 200;
+        response.writeHead(statusCode, headers);
+        response.end(JSON.stringify({results: [{username: 'domain', messages: 'no messages yet', objectId: 0}]}));
+      }
+
+      if (urlArray[1] === 'order=-createdAt') {
+        statusCode = 200;
+        response.writeHead(statusCode, headers);  
+        var reversed = output.results.slice().reverse();
+        var returnValue = {'results': reversed};
+        response.end(JSON.stringify(returnValue));
+      } else {
+        statusCode = 200;
+        response.writeHead(statusCode, headers);
+        response.end(JSON.stringify(output));
+      }
+
       
     } else if (request.method === 'POST') {
-      var messages = [];
+      var inbound = [];
+      
       request.on('data', function(data) {
-        messages.push(data);
+        inbound.push(data);
       });
       
       request.on('end', function() {
-        var parsed = JSON.parse(messages);
-        output.results.push(parsed);
+        var parsed = JSON.parse(`"${inbound}"`);
+        parsed = encodeURI(inbound);
+        parsed = decodeUriComponent(parsed);
+        console.log(parsed);
+        var messagePieces = parsed.split('&');
+        var message = {};
+        for (var piece of messagePieces) {
+          tuple = piece.split('=');
+          message[tuple[0]] = tuple[1];
+        }
+        message['objectId'] = nextId;
+
+        nextId++; 
+
+        output.results.push(message);
       
         statusCode = 201;
-        
+        console.log('OUTPUT:', output);
         response.writeHead(statusCode, headers);
         response.end(JSON.stringify(output));
       });
-      
-    } else if (request.method === 'OPTIONS') {
-      
       
     } 
   } else {
@@ -57,50 +89,13 @@ var requestHandler = function(request, response) {
     response.writeHead(statusCode, headers);
     response.end();
   }
-  // Request and Response come from node's http module.
-  //
-  // They include information about both the incoming request, such as
-  // headers and URL, and about the outgoing response, such as its status
-  // and content.
-  //
-  // Documentation for both request and response can be found in the HTTP section at
-  // http://nodejs.org/documentation/api/
-
-  // Do some basic logging.
-  //
-  // Adding more logging to your server can be an easy way to get passive
-  // debugging help, but you should always be careful about leaving stray
-  // console.logs in your code.
-  // The outgoing status.
-
-  // See the note below about CORS headers.
-
-  // Tell the client we are sending them plain text.
-  //
-  // You will need to change this if you are sending something
-  // other than plain text, like JSON or HTML.
-
-  // .writeHead() writes to the request line and headers of the response,
-  // which includes the status and all headers.
-
-  // Make sure to always call response.end() - Node may not send
-  // anything back to the client until you do. The string you pass to
-  // response.end() will be the body of the response - i.e. what shows
-  // up in the browser.
-  //
-  // Calling .end "flushes" the response's internal buffer, forcing
-  // node to actually send all the data over to the client.
 };
 
-// These headers will allow Cross-Origin Resource Sharing (CORS).
-// This code allows this server to talk to websites that
-// are on different domains, for instance, your chat client.
-//
-// Your chat client is running from a url like file://your/chat/client/index.html,
-// which is considered a different domain.
-//
-// Another way to get around this restriction is to serve you chat
-// client from this domain by setting up static file serving.
+var parseRequest = function(requestUrl) {
+  var urlArray = requestUrl.split('?');
+  return urlArray;
+};
+
 var defaultCorsHeaders = {
   'access-control-allow-origin': '*',
   'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS',

@@ -13,20 +13,49 @@ this file and include it in basic-server.js so that it actually works.
 **************************************************************/
 var url = require('url');
 var fs = require('fs');
-var content;
-var filePath = '/Users/student/Desktop/hratx32-chatterbox-server/server/';
+var output = {results: []};
 
 var requestHandler = function(request, response) {
-  
+  console.log('Serving request type ' + request.method + ' for url ' + request.url);
+
+  var headers = defaultCorsHeaders;
+  headers['Content-Type'] = 'application/json';
+
+
+  var statusCode;
   if (request.url === '/classes/messages') {
-    fs.readFile(filePath + 'classes/messages.js', 'utf8', function(err, data) {
-      if (err) {
-        throw err;
-      } else {
-        console.log('content', content);
-        content = data;// do the thing here and assign it to content
-      }
-    });
+
+    if (request.method === 'GET') {
+      response.results = messages;
+      statusCode = 200;
+      
+      response.writeHead(statusCode, headers);
+      response.end(JSON.stringify(output));
+      
+    } else if (request.method === 'POST') {
+      var messages = [];
+      request.on('data', function(data) {
+        messages.push(data);
+      });
+      
+      request.on('end', function() {
+        var parsed = JSON.parse(messages);
+        output.results.push(parsed);
+      
+        statusCode = 201;
+        
+        response.writeHead(statusCode, headers);
+        response.end(JSON.stringify(output));
+      });
+      
+    } else if (request.method === 'OPTIONS') {
+      
+      
+    } 
+  } else {
+    statusCode = 404;
+    response.writeHead(statusCode, headers);
+    response.end();
   }
   // Request and Response come from node's http module.
   //
@@ -42,22 +71,17 @@ var requestHandler = function(request, response) {
   // Adding more logging to your server can be an easy way to get passive
   // debugging help, but you should always be careful about leaving stray
   // console.logs in your code.
-  console.log('Serving request type ' + request.method + ' for url ' + request.url);
   // The outgoing status.
-  var statusCode = 200;
 
   // See the note below about CORS headers.
-  var headers = defaultCorsHeaders;
 
   // Tell the client we are sending them plain text.
   //
   // You will need to change this if you are sending something
   // other than plain text, like JSON or HTML.
-  headers['Content-Type'] = 'application/json';
 
   // .writeHead() writes to the request line and headers of the response,
   // which includes the status and all headers.
-  response.writeHead(statusCode, headers);
 
   // Make sure to always call response.end() - Node may not send
   // anything back to the client until you do. The string you pass to
@@ -66,7 +90,6 @@ var requestHandler = function(request, response) {
   //
   // Calling .end "flushes" the response's internal buffer, forcing
   // node to actually send all the data over to the client.
-  response.end(content);
 };
 
 // These headers will allow Cross-Origin Resource Sharing (CORS).

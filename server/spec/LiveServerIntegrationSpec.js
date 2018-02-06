@@ -11,6 +11,8 @@ describe('server', function() {
 
   it('should send back parsable stringified JSON', function(done) {
     request('http://127.0.0.1:3000/classes/messages', function(error, response, body) {
+      console.log(response);
+      console.log(body);
       expect(JSON.parse.bind(this, body)).to.not.throw();
       done();
     });
@@ -56,6 +58,8 @@ describe('server', function() {
     };
 
     request(requestParams, function(error, response, body) {
+      console.log("HERE IS THE RESPONSE", response);
+      console.log("HERE IS THE BODY");
       // Now if we request the log, that message we posted should be there:
       request('http://127.0.0.1:3000/classes/messages', function(error, response, body) {
         var messages = JSON.parse(body).results;
